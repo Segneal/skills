@@ -195,7 +195,6 @@
       const g = new dagre.graphlib.Graph();
       g.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 70, marginx: PADDING, marginy: PADDING });
       g.setDefaultEdgeLabel(() => ({}));
-
       for (const n of nodes) {
         g.setNode(n.id, { width: NODE_W, height: NODE_H });
       }
@@ -215,7 +214,12 @@
       let maxX = 0, maxY = 0;
       for (const id of g.nodes()) {
         const n = g.node(id);
-        positions[id] = { x: n.x - NODE_W / 2, y: n.y - NODE_H / 2 };
+        positions[id] = {
+          x: n.x - NODE_W / 2,
+          y: n.y - NODE_H / 2,
+          cx: n.x,
+          cy: n.y,
+        };
         maxX = Math.max(maxX, n.x + NODE_W / 2);
         maxY = Math.max(maxY, n.y + NODE_H / 2);
       }
@@ -224,7 +228,6 @@
 
     function renderNodes() {
       const svg = document.getElementById('canvas');
-      // Remove existing node groups (keep <defs>)
       svg.querySelectorAll('g.node').forEach(el => el.remove());
 
       const { positions } = state.layout;
@@ -260,8 +263,161 @@
         }
         svg.appendChild(g);
       }
-
       svg.setAttribute('viewBox', `0 0 ${state.layout.width} ${state.layout.height}`);
+    }
+
+    function renderSidebar() {
+      const container = document.getElementById('actions');
+      container.innerHTML = '';
+      if (state.data.actions.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = 'No actions defined';
+        container.appendChild(empty);
+        return;
+      }
+      for (const action of state.data.actions) {
+        const el = document.createElement('div');
+        el.className = 'action-item';
+        el.dataset.actionId = action.id;
+        el.textContent = action.name;
+        el.addEventListener('click', () => toggleAction(action.id));
+        container.appendChild(el);
+      }
+    }
+
+    function toggleAction(actionId) {
+      if (state.activeActionId === actionId) {
+        clearActive();
+      } else {
+        setActive(actionId);
+      }
+    }
+
+    function clearActive() {
+      state.activeActionId = null;
+      document.querySelectorAll('.action-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('g.node').forEach(el => {
+        el.classList.remove('active');
+        el.classList.remove('inactive');
+      });
+      removeEdges();
+      document.getElementById('detail').innerHTML = '<div class="empty-state">Select an action</div>';
+    }
+
+    function setActive(actionId) {
+      const action = state.data.actions.find(a => a.id === actionId);
+      if (!action) return;
+      state.activeActionId = actionId;
+
+      document.querySelectorAll('.action-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.actionId === actionId);
+      });
+
+      const involved = new Set();
+      for (const edge of (action.edges || [])) {
+        involved.add(edge.from);
+        involved.add(edge.to);
+      }
+      document.querySelectorAll('g.node').forEach(el => {
+        const id = el.getAttribute('data-id');
+        if (involved.has(id)) {
+          el.classList.add('active');
+          el.classList.remove('inactive');
+        } else {
+          el.classList.add('inactive');
+          el.classList.remove('active');
+        }
+      });
+
+      renderEdges(action);
+      renderDetail(action);
+    }
+
+    function removeEdges() {
+      document.querySelectorAll('path.edge').forEach(el => el.remove());
+    }
+
+    function renderEdges(action) {
+      removeEdges();
+      const svg = document.getElementById('canvas');
+      const { positions } = state.layout;
+      for (const edge of (action.edges || [])) {
+        const from = positions[edge.from];
+        const to = positions[edge.to];
+        if (!from || !to) continue;
+        const x1 = from.cx + NODE_W / 2 * sign(to.cx - from.cx);
+        const y1 = from.cy;
+        const x2 = to.cx - NODE_W / 2 * sign(to.cx - from.cx);
+        const y2 = to.cy;
+        const mx = (x1 + x2) / 2;
+        const d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'edge' + (edge.async ? ' async' : ''));
+        path.setAttribute('d', d);
+        path.setAttribute('marker-end', 'url(#arrow)');
+        svg.appendChild(path);
+      }
+    }
+
+    function sign(n) { return n >= 0 ? 1 : -1; }
+
+    function renderDetail(action) {
+      const el = document.getElementById('detail');
+      el.innerHTML = '';
+      const title = document.createElement('div');
+      title.style.cssText = 'color:#fff;font-size:14px;font-weight:600;margin-bottom:6px';
+      title.textContent = action.name;
+      el.appendChild(title);
+
+      if (action.description) {
+        const desc = document.createElement('div');
+        desc.style.cssText = 'color:var(--muted);font-size:12px;margin-bottom:14px';
+        desc.textContent = action.description;
+        el.appendChild(desc);
+      }
+
+      const edgesLabel = document.createElement('div');
+      edgesLabel.className = 'label';
+      edgesLabel.textContent = 'Edges';
+      el.appendChild(edgesLabel);
+
+      if (!action.edges || action.edges.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = 'No edges';
+        el.appendChild(empty);
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.className = 'edge-list';
+      for (const edge of action.edges) {
+        const item = document.createElement('div');
+        item.className = 'edge-item';
+        const ends = document.createElement('div');
+        ends.className = 'ends';
+        ends.innerHTML = `${escape(edge.from)} ${edge.async ? '⇢' : '→'} ${escape(edge.to)}`
+          + (edge.async ? '<span class="async-tag">(async)</span>' : '');
+        const code = document.createElement('code');
+        code.textContent = edge.payload || '';
+        item.appendChild(ends);
+        item.appendChild(code);
+        list.appendChild(item);
+      }
+      el.appendChild(list);
+    }
+
+    function escape(s) {
+      const d = document.createElement('div');
+      d.textContent = String(s);
+      return d.innerHTML;
+    }
+
+    function setupKeyboard() {
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') clearActive();
+      });
     }
 
     async function load() {
@@ -282,7 +438,8 @@
       }
       state.layout = computeLayout(state.data.nodes, state.data.actions);
       renderNodes();
-      // Sidebar + edge rendering added in Task 6.
+      renderSidebar();
+      setupKeyboard();
     }
 
     load();
