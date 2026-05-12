@@ -1,0 +1,29 @@
+{
+  "_doc": "Schema: { nodes: [{id, name, subtitle?}], actions: [{id, name, description?, edges: [{from, to, payload, async?}]}] }. The _doc field is ignored by the renderer.",
+  "nodes": [
+    { "id": "auth",     "name": "auth",     "subtitle": "@app/auth" },
+    { "id": "invites",  "name": "invites",  "subtitle": "@app/invites" },
+    { "id": "email",    "name": "email",    "subtitle": "@app/email" },
+    { "id": "db",       "name": "db",       "subtitle": "@app/db" },
+    { "id": "billing",  "name": "billing",  "subtitle": "@app/billing" }
+  ],
+  "actions": [
+    {
+      "id": "invite-user",
+      "name": "Invite new user",
+      "description": "A user invites someone by email",
+      "edges": [
+        { "from": "auth",    "to": "invites", "payload": "{ inviterId, role }",   "async": false },
+        { "from": "invites", "to": "email",   "payload": "{ to, token, link }",   "async": false },
+        { "from": "invites", "to": "db",      "payload": "insert pending_invite", "async": false },
+        { "from": "email",   "to": "db",      "payload": "mark sent_at",          "async": true  }
+      ]
+    },
+    {
+      "id": "desktop-build",
+      "name": "Desktop build",
+      "description": "Placeholder — replace with your own flow",
+      "edges": []
+    }
+  ]
+}
