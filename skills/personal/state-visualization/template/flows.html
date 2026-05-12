@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Flow Explorer</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root {
+      --bg: #0e0f13;
+      --panel: #15171f;
+      --border: #232633;
+      --text: #e6e8ee;
+      --muted: #8a90a3;
+      --label: #5d6275;
+      --accent: #7c5cff;
+      --accent-soft: rgba(124, 92, 255, 0.18);
+      --accent-edge: rgba(74, 214, 255, 0.08);
+      --node-stroke-inactive: #3a3f52;
+      --edge-cold: #2a2e3d;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+      height: 100%;
+    }
+    body { padding: 24px; }
+    .header { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+    .header .bar {
+      width: 6px; height: 24px;
+      background: linear-gradient(180deg, #7c5cff, #4ad6ff);
+      border-radius: 3px;
+    }
+    .header h1 {
+      margin: 0; font-size: 18px; font-weight: 600;
+      letter-spacing: -0.01em; color: #fff;
+    }
+    .subtitle {
+      color: var(--muted); margin: 0 0 20px 18px; font-size: 13px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 220px 1fr 300px;
+      gap: 16px;
+      min-height: calc(100vh - 110px);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      overflow: auto;
+    }
+    .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--label);
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .action-list { display: flex; flex-direction: column; gap: 4px; }
+    .action-item {
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .action-item:hover { color: var(--text); }
+    .action-item.active {
+      background: linear-gradient(90deg, var(--accent-soft), var(--accent-edge));
+      border: 1px solid #4a3d8a;
+      color: #c8b9ff;
+      font-weight: 500;
+    }
+    #canvas { width: 100%; height: 100%; min-height: 360px; }
+    .empty-state {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; color: var(--label); font-size: 13px;
+    }
+    .edge-list { display: flex; flex-direction: column; gap: 10px; font-size: 11.5px; }
+    .edge-item .ends { color: #c8b9ff; font-weight: 500; }
+    .edge-item .async-tag { color: var(--label); font-weight: 400; margin-left: 4px; }
+    .edge-item code {
+      color: var(--muted);
+      font-size: 10.5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    /* SVG node and edge styles */
+    .node rect {
+      fill: #1c1f2c;
+      stroke: var(--node-stroke-inactive);
+      stroke-width: 1.5;
+      transition: stroke 200ms, opacity 200ms, filter 200ms;
+    }
+    .node text { fill: #fff; font-size: 13px; font-weight: 600; }
+    .node text.subtitle-text { fill: var(--muted); font-size: 10px; font-weight: 400; }
+    .node.active rect {
+      stroke: var(--accent);
+      stroke-width: 2;
+      filter: url(#glow);
+    }
+    .node.inactive { opacity: 0.35; }
+    .edge {
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      fill: none;
+      filter: url(#glow);
+      transition: opacity 200ms;
+    }
+    .edge.async { stroke-dasharray: 4 3; }
+    .error-banner {
+      background: #3a1f1f; border: 1px solid #5a2929;
+      color: #ffb4b4; padding: 10px 14px; border-radius: 8px;
+      font-size: 13px; margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="bar"></div>
+    <h1>Flow Explorer</h1>
+  </div>
+  <p class="subtitle">Click an action to highlight the subgraph of packages involved.</p>
+
+  <div id="error" class="error-banner" style="display:none"></div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="label">Actions</div>
+      <div id="actions" class="action-list"></div>
+    </div>
+    <div class="panel">
+      <svg id="canvas" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+            <path d="M0,0 L9,3 L0,6 z" fill="#7c5cff"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="panel">
+      <div class="label">Flow</div>
+      <div id="detail"><div class="empty-state">Select an action</div></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+  <script>
+    // Renderer code is added in Tasks 5 and 6.
+  </script>
+</body>
+</html>
