@@ -53,7 +53,7 @@ mkdir -p skills/personal/state-visualization/template
 
 Expected: no output. Verify with `ls skills/personal/state-visualization/` → shows `template/`.
 
-- [ ] **Step 2: Create SKILL.md with frontmatter only (body comes in Task 6)**
+- [ ] **Step 2: Create SKILL.md with frontmatter only (body comes in Task 7)**
 
 Write `skills/personal/state-visualization/SKILL.md`:
 
@@ -65,7 +65,7 @@ description: Scaffold an interactive HTML page that visualizes workflows between
 
 # state-visualization
 
-(Body of SKILL.md is added in Task 6.)
+(Body of SKILL.md is added in Task 7.)
 ```
 
 - [ ] **Step 3: Verify frontmatter parses**
