@@ -155,7 +155,137 @@
 
   <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
   <script>
-    // Renderer code is added in Tasks 5 and 6.
+    const NODE_W = 120;
+    const NODE_H = 60;
+    const PADDING = 20;
+
+    const state = {
+      data: null,
+      activeActionId: null,
+      layout: null,
+    };
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function validateData(data) {
+      if (!data || typeof data !== 'object') {
+        throw new Error('flows.json must be a JSON object');
+      }
+      const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+      const actions = Array.isArray(data.actions) ? data.actions : [];
+      const nodeIds = new Set(nodes.map(n => n.id));
+      for (const action of actions) {
+        for (const edge of (action.edges || [])) {
+          if (!nodeIds.has(edge.from)) {
+            console.warn(`Action "${action.name}" edge references unknown node id "${edge.from}"`);
+          }
+          if (!nodeIds.has(edge.to)) {
+            console.warn(`Action "${action.name}" edge references unknown node id "${edge.to}"`);
+          }
+        }
+      }
+      return { nodes, actions };
+    }
+
+    function computeLayout(nodes, actions) {
+      const g = new dagre.graphlib.Graph();
+      g.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 70, marginx: PADDING, marginy: PADDING });
+      g.setDefaultEdgeLabel(() => ({}));
+
+      for (const n of nodes) {
+        g.setNode(n.id, { width: NODE_W, height: NODE_H });
+      }
+      const seen = new Set();
+      for (const action of actions) {
+        for (const edge of (action.edges || [])) {
+          const key = `${edge.from}->${edge.to}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            g.setEdge(edge.from, edge.to);
+          }
+        }
+      }
+      dagre.layout(g);
+
+      const positions = {};
+      let maxX = 0, maxY = 0;
+      for (const id of g.nodes()) {
+        const n = g.node(id);
+        positions[id] = { x: n.x - NODE_W / 2, y: n.y - NODE_H / 2 };
+        maxX = Math.max(maxX, n.x + NODE_W / 2);
+        maxY = Math.max(maxY, n.y + NODE_H / 2);
+      }
+      return { positions, width: maxX + PADDING, height: maxY + PADDING };
+    }
+
+    function renderNodes() {
+      const svg = document.getElementById('canvas');
+      // Remove existing node groups (keep <defs>)
+      svg.querySelectorAll('g.node').forEach(el => el.remove());
+
+      const { positions } = state.layout;
+      for (const node of state.data.nodes) {
+        const pos = positions[node.id];
+        if (!pos) continue;
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', 'node');
+        g.setAttribute('data-id', node.id);
+        g.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('width', NODE_W);
+        rect.setAttribute('height', NODE_H);
+        rect.setAttribute('rx', 10);
+        g.appendChild(rect);
+
+        const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        nameText.setAttribute('x', NODE_W / 2);
+        nameText.setAttribute('y', node.subtitle ? 28 : 36);
+        nameText.setAttribute('text-anchor', 'middle');
+        nameText.textContent = node.name;
+        g.appendChild(nameText);
+
+        if (node.subtitle) {
+          const subText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          subText.setAttribute('class', 'subtitle-text');
+          subText.setAttribute('x', NODE_W / 2);
+          subText.setAttribute('y', 46);
+          subText.setAttribute('text-anchor', 'middle');
+          subText.textContent = node.subtitle;
+          g.appendChild(subText);
+        }
+        svg.appendChild(g);
+      }
+
+      svg.setAttribute('viewBox', `0 0 ${state.layout.width} ${state.layout.height}`);
+    }
+
+    async function load() {
+      let raw;
+      try {
+        const res = await fetch('./flows.json');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        raw = await res.json();
+      } catch (err) {
+        showError(`Could not load flows.json: ${err.message}. Are you serving via http? Run ./serve-flows.sh`);
+        return;
+      }
+      try {
+        state.data = validateData(raw);
+      } catch (err) {
+        showError(err.message);
+        return;
+      }
+      state.layout = computeLayout(state.data.nodes, state.data.actions);
+      renderNodes();
+      // Sidebar + edge rendering added in Task 6.
+    }
+
+    load();
   </script>
 </body>
 </html>
