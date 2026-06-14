@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Thread — SVG path animator demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..600&family=Newsreader:ital,opsz@0,6..72;1,6..72&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f3ede1;
+    --ink: #1a1714;
+    --rust: #bf4422;
+    --line-w: 3.5;
+    --card-w: 360px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 18px; line-height: 1.6;
+    background-image:
+      radial-gradient(circle at 50% 0%, rgba(191,68,34,0.06), transparent 60%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    overflow-x: hidden;
+  }
+
+  .masthead {
+    max-width: 1000px; margin: 0 auto; padding: 14vh 24px 6vh;
+    text-align: center; position: relative; z-index: 10;
+  }
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace; font-size: 12px;
+    letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--rust); margin-bottom: 1.4rem;
+  }
+  .masthead h1 {
+    font-family: "Fraunces", serif; font-optical-sizing: auto;
+    font-weight: 600; font-size: clamp(2.8rem, 8vw, 6rem);
+    line-height: 0.96; letter-spacing: -0.02em;
+  }
+  .masthead h1 em { font-style: italic; font-weight: 300; color: var(--rust); }
+  .masthead p { max-width: 48ch; margin: 1.8rem auto 0; color: #5a534a; font-size: 1.15rem; }
+
+  .stage { position: relative; max-width: 1000px; margin: 0 auto; padding: 4vh 0 16vh; }
+
+  /* two synced layers: connectors BEHIND the cards, icons IN FRONT */
+  .layer {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; overflow: visible;
+  }
+  #thread { z-index: 0; }   /* weaving line, hidden behind cards */
+  #icons  { z-index: 6; }   /* medical icons, drawn over the scene */
+
+  .seg {
+    fill: none; stroke: var(--rust); stroke-width: var(--line-w);
+    stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 1; stroke-dashoffset: 1;   /* start hidden */
+  }
+  .ghost {
+    fill: none; stroke: var(--ink); stroke-width: 1;
+    stroke-dasharray: 2 6; opacity: 0.10;
+  }
+  .head {
+    fill: var(--rust); stroke: var(--paper); stroke-width: 3;
+    opacity: 0; transition: opacity 0.25s;
+  }
+  .head.live { opacity: 1; }
+
+  .row { display: flex; align-items: center; min-height: 380px; padding: 0 24px; position: relative; z-index: 2; }
+  .row--right { justify-content: flex-end; }
+  .row--left  { justify-content: flex-start; }
+
+  .card {
+    width: var(--card-w); background: #fbf8f1; padding: 14px 14px 22px;
+    border: 1px solid rgba(26,23,20,0.12);
+    box-shadow: 0 30px 60px -28px rgba(26,23,20,0.45);
+    transform: translateY(36px) rotate(var(--tilt, 0deg)); opacity: 0;
+    transition: transform 0.9s cubic-bezier(.2,.7,.2,1), opacity 0.9s ease;
+  }
+  .card.in { transform: translateY(0) rotate(var(--tilt, 0deg)); opacity: 1; }
+  .row--right .card { --tilt: 1.4deg; }
+  .row--left  .card { --tilt: -1.6deg; }
+
+  .card__media {
+    aspect-ratio: 4 / 3; background: #ddd2c0 center/cover no-repeat;
+    filter: grayscale(0.25) contrast(1.03);
+  }
+  .card__index { font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.2em; color: var(--rust); margin: 16px 4px 4px; }
+  .card__title { font-family: "Fraunces", serif; font-weight: 500; font-size: 1.5rem; line-height: 1.1; margin: 0 4px; }
+  .card__body  { margin: 8px 4px 0; color: #6b6357; font-size: 0.98rem; }
+
+  footer { text-align: center; padding: 8vh 24px 12vh; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: #8a8175; position: relative; z-index: 10; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .seg { stroke-dashoffset: 0 !important; }
+    .head { display: none; }
+    .card { transform: rotate(var(--tilt,0deg)); opacity: 1; transition: none; }
+  }
+  @media (max-width: 720px) {
+    :root { --card-w: 78vw; }
+    .row { min-height: 300px; }
+    .row--right, .row--left { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+  <header class="masthead">
+    <div class="eyebrow">SVG Path Animator · scroll to draw</div>
+    <h1>Un <em>hilo</em> que se vuelve<br>instrumento</h1>
+    <p>Scrollea. Una sola línea SVG baja serpenteando por detrás de las imágenes y,
+       al llegar a cada una, se dibuja como un ícono médico: estetoscopio, maletín, corazón.</p>
+  </header>
+
+  <section class="stage" id="stage">
+    <svg id="thread" class="layer" viewBox="0 0 1000 1400" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+
+    <div class="row row--left">
+      <article class="card">
+        <div class="card__media" data-img="1080"></div>
+        <div class="card__index">01 — DIAGNÓSTICO</div>
+        <h2 class="card__title">El estetoscopio</h2>
+        <p class="card__body">El hilo baja desde arriba y, al acercarse, se dibuja como un estetoscopio.</p>
+      </article>
+    </div>
+
+    <div class="row row--right">
+      <article class="card">
+        <div class="card__media" data-img="1059"></div>
+        <div class="card__index">02 — GUARDIA</div>
+        <h2 class="card__title">El maletín</h2>
+        <p class="card__body">Cruza hacia el otro lado y traza un maletín de medicina antes de seguir.</p>
+      </article>
+    </div>
+
+    <div class="row row--left">
+      <article class="card">
+        <div class="card__media" data-img="1062"></div>
+        <div class="card__index">03 — CUIDADO</div>
+        <h2 class="card__title">El corazón</h2>
+        <p class="card__body">Vuelve a bajar y cierra el recorrido dibujando un corazón.</p>
+      </article>
+    </div>
+
+    <svg id="icons" class="layer" viewBox="0 0 1000 1400" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+  </section>
+
+  <footer>stroke-dasharray + ventanas de scroll · skills/svg-path-animator</footer>
+
+<script>
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  /* ---- medical icon path generators (absolute viewBox coords) ---- */
+  const icon = {
+    stethoscope(cx, cy, s) {
+      return [
+        // binaural headband (arch) with earpiece tips at each end
+        `M ${cx-0.62*s},${cy-0.22*s} L ${cx-0.55*s},${cy-0.35*s}`
+          + ` C ${cx-0.55*s},${cy-1.15*s} ${cx+0.55*s},${cy-1.15*s} ${cx+0.55*s},${cy-0.35*s}`
+          + ` L ${cx+0.62*s},${cy-0.22*s}`,
+        // tube curving down into the chestpiece
+        `M ${cx+0.55*s},${cy-0.32*s} C ${cx+0.82*s},${cy+0.30*s} ${cx+0.10*s},${cy+0.32*s} ${cx},${cy+0.58*s}`,
+        // chestpiece (bell) — a circle via two arcs
+        `M ${cx-0.2*s},${cy+0.78*s} a ${0.2*s},${0.2*s} 0 1 0 ${0.4*s},0 a ${0.2*s},${0.2*s} 0 1 0 ${-0.4*s},0`,
+      ].join(" ");
+    },
+    bag(cx, cy, s) {
+      return [
+        // body (rounded rectangle)
+        `M ${cx-1.0*s},${cy-0.30*s} Q ${cx-1.0*s},${cy-0.45*s} ${cx-0.85*s},${cy-0.45*s}`
+          + ` H ${cx+0.85*s} Q ${cx+1.0*s},${cy-0.45*s} ${cx+1.0*s},${cy-0.30*s}`
+          + ` V ${cy+0.50*s} Q ${cx+1.0*s},${cy+0.62*s} ${cx+0.85*s},${cy+0.62*s}`
+          + ` H ${cx-0.85*s} Q ${cx-1.0*s},${cy+0.62*s} ${cx-1.0*s},${cy+0.50*s} Z`,
+        // handle
+        `M ${cx-0.30*s},${cy-0.45*s} Q ${cx-0.30*s},${cy-0.78*s} ${cx},${cy-0.78*s} Q ${cx+0.30*s},${cy-0.78*s} ${cx+0.30*s},${cy-0.45*s}`,
+        // cross (vertical + horizontal)
+        `M ${cx},${cy-0.10*s} V ${cy+0.38*s}`,
+        `M ${cx-0.24*s},${cy+0.14*s} H ${cx+0.24*s}`,
+      ].join(" ");
+    },
+    heart(cx, cy, s) {
+      return `M ${cx},${cy+0.75*s}`
+        + ` C ${cx-1.05*s},${cy-0.05*s} ${cx-0.62*s},${cy-0.85*s} ${cx},${cy-0.30*s}`
+        + ` C ${cx+0.62*s},${cy-0.85*s} ${cx+1.05*s},${cy-0.05*s} ${cx},${cy+0.75*s} Z`;
+    },
+  };
+
+  const stage  = document.getElementById("stage");
+  const thread = document.getElementById("thread");
+  const icons  = document.getElementById("icons");
+  const layerEl = { thread, icons };
+  const order = ["stethoscope", "bag", "heart"];   // one per image, in order
+
+  // a smooth S-curve between two points, biased vertically
+  function connector(a, b) {
+    const dy = (b[1] - a[1]) * 0.45;
+    return `M ${a[0]},${a[1]} C ${a[0]},${a[1]+dy} ${b[0]},${b[1]-dy} ${b[0]},${b[1]}`;
+  }
+
+  let segs = [];
+  let heads = {};
+
+  // Geometry is DOM-driven: viewBox == real stage pixels (1:1, no distortion),
+  // icons are centred on each photo so the thread "becomes" the icon there.
+  function build() {
+    [thread, icons].forEach(svg => {
+      svg.setAttribute("viewBox", `0 0 ${stage.offsetWidth} ${stage.offsetHeight}`);
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.innerHTML = "";
+    });
+    segs = [];
+
+    const medias = [...document.querySelectorAll(".card__media")];
+    const cards  = [...document.querySelectorAll(".card")];
+    // The cards' entrance transform makes each card the offsetParent of its
+    // media AND shifts its rect — neutralise it while we measure true positions.
+    const saved = cards.map(c => c.style.transform);
+    cards.forEach(c => (c.style.transform = "none"));
+    const sb = stage.getBoundingClientRect();
+    const W = sb.width;
+    const centers = medias.map(m => {
+      const r = m.getBoundingClientRect();
+      return [r.left - sb.left + r.width / 2, r.top - sb.top + r.height / 2];
+    });
+    const scales = medias.map(m => {
+      const r = m.getBoundingClientRect();
+      return Math.min(r.width, r.height) * 0.36;
+    });
+    cards.forEach((c, i) => (c.style.transform = saved[i]));
+
+    const TOP = [W / 2, 26];
+    const SEGMENTS = [];
+    let prev = TOP;
+    centers.forEach((c, i) => {
+      SEGMENTS.push({ layer: "thread", d: connector(prev, c) });
+      SEGMENTS.push({ layer: "icons",  d: icon[order[i]](c[0], c[1], scales[i]) });
+      prev = c;
+    });
+    // tail trailing off the last icon
+    SEGMENTS.push({ layer: "thread", d: connector(prev, [prev[0], prev[1] + 220]) });
+
+    // faint ghost of the connectors
+    SEGMENTS.filter(s => s.layer === "thread").forEach(s => {
+      const g = document.createElementNS(SVGNS, "path");
+      g.setAttribute("class", "ghost"); g.setAttribute("d", s.d);
+      thread.appendChild(g);
+    });
+
+    // real animated segments
+    segs = SEGMENTS.map(s => {
+      const el = document.createElementNS(SVGNS, "path");
+      el.setAttribute("class", "seg");
+      el.setAttribute("pathLength", "1");
+      el.setAttribute("d", s.d);
+      layerEl[s.layer].appendChild(el);
+      return { el, layer: s.layer, len: el.getTotalLength() };
+    });
+
+    // head dot per layer
+    const mkHead = (svg) => {
+      const c = document.createElementNS(SVGNS, "circle");
+      c.setAttribute("class", "head"); c.setAttribute("r", "7");
+      svg.appendChild(c); return c;
+    };
+    heads = { thread: mkHead(thread), icons: mkHead(icons) };
+
+    // weight each segment's timeline slice by its length
+    const total = segs.reduce((a, s) => a + s.len, 0) || 1;
+    let acc = 0;
+    segs.forEach(s => { s.start = acc / total; acc += s.len; s.end = acc / total; });
+  }
+
+  /* ---- reveal cards + load images ---- */
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("in"); });
+  }, { threshold: 0.3 });
+  document.querySelectorAll(".card").forEach(c => io.observe(c));
+  document.querySelectorAll(".card__media").forEach(el => {
+    el.style.backgroundImage = `url(https://picsum.photos/id/${el.dataset.img}/640/480?grayscale)`;
+  });
+
+  build();
+
+  /* ---- drive from scroll ---- */
+  if (reduce) {
+    segs.forEach(s => s.el.style.strokeDashoffset = 0);
+  } else {
+    let progress = 0, target = 0;
+    function measure() {
+      const r = stage.getBoundingClientRect();
+      const vh = window.innerHeight;
+      // progress 0 when the stage top is ~85% down the viewport,
+      // progress 1 by the time its bottom rises to ~85% — completes before
+      // the absolute bottom so the last icon finishes drawing while in view.
+      const start = vh * 0.85, end = -r.height + vh * 0.85;
+      target = Math.max(0, Math.min(1, (start - r.top) / (start - end)));
+    }
+    function frame() {
+      progress += (target - progress) * 0.12;
+      const p = progress;
+      heads.thread.classList.remove("live");
+      heads.icons.classList.remove("live");
+      segs.forEach(s => {
+        const local = Math.max(0, Math.min(1, (p - s.start) / (s.end - s.start)));
+        s.el.style.strokeDashoffset = 1 - local;
+        if (local > 0.001 && local < 0.999) {
+          const pt = s.el.getPointAtLength(local * s.len);
+          const h = heads[s.layer];
+          h.setAttribute("cx", pt.x); h.setAttribute("cy", pt.y);
+          h.classList.add("live");
+        }
+      });
+      requestAnimationFrame(frame);
+    }
+    let rt;
+    window.addEventListener("resize", () => {
+      clearTimeout(rt);
+      rt = setTimeout(() => { build(); measure(); }, 150);
+    });
+    window.addEventListener("scroll", measure, { passive: true });
+    measure();
+    requestAnimationFrame(frame);
+  }
+</script>
+</body>
+</html>
