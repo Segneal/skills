@@ -157,6 +157,7 @@ Skills I use daily for code work.
 - **[zoom-out](./skills/engineering/zoom-out/SKILL.md)** — Tell the agent to zoom out and give broader context or a higher-level perspective on an unfamiliar section of code.
 - **[prototype](./skills/engineering/prototype/SKILL.md)** — Build a throwaway prototype to flesh out a design — either a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route.
 - **[thermo-nuclear-code-quality-review](./skills/engineering/thermo-nuclear-code-quality-review/SKILL.md)** — Extremely strict maintainability review that hunts for "code judo" simplifications, giant files, and spaghetti-condition growth.
+- **[svg-path-animator](./skills/engineering/svg-path-animator/SKILL.md)** — Animate SVG paths: self-drawing stroke effects (the `stroke-dasharray`/`dashoffset` trick), morphing one shape into another, and moving elements along a path — with CSS/WAAPI/SMIL recipes and a library decision guide.
 
 ### Productivity
 
