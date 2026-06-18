@@ -23,3 +23,5 @@ Model- or user-reachable (rich trigger phrasing so the model can reach for them)
 - **[tdd](./tdd/SKILL.md)** — Test-driven development with a red-green-refactor loop. Builds features or fixes bugs one vertical slice at a time.
 - **[domain-modeling](./domain-modeling/SKILL.md)** — Actively build and sharpen a project's domain model — challenge terms, stress-test with scenarios, update `CONTEXT.md` and ADRs inline.
 - **[codebase-design](./codebase-design/SKILL.md)** — Shared discipline and vocabulary for designing deep modules: small interfaces, clean seams, testable through the interface.
+- **[thermo-nuclear-code-quality-review](./thermo-nuclear-code-quality-review/SKILL.md)** — Extremely strict maintainability review that hunts for "code judo" simplifications, giant files, and spaghetti-condition growth.
+- **[svg-path-animator](./svg-path-animator/SKILL.md)** — Animate SVG paths: self-drawing stroke effects (the `stroke-dasharray`/`dashoffset` trick), morphing one shape into another, and moving elements along a path — with CSS/WAAPI/SMIL recipes and a library decision guide.
